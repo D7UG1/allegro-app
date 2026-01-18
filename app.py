@@ -169,7 +169,7 @@ if st.button("🔍 Znajdź najtańszą ofertę", type="primary"):
         'Accept': 'application/vnd.allegro.public.v1+json',
         # Streamlit działa na serwerze, więc udajemy przeglądarkę
         'User-Agent': 'Mozilla/5.0 (compatible; MyAllegroApp/1.0)'
-    }
+    
     params = {
         'phrase': phrase,
         'sort': '+price',

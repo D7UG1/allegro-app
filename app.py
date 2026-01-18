@@ -1,5 +1,6 @@
 import streamlit as st
-import requests
+import cloudscraper
+import json
 
 # Konfiguracja strony
 st.set_page_config(page_title="Allegro Szperacz", page_icon="🛒")
@@ -13,18 +14,18 @@ except Exception:
     st.error("Brak kluczy API w 'Secrets'!")
     st.stop()
 
+# --- UTWORZENIE SKRAPERA (To omija zabezpieczenia) ---
+scraper = cloudscraper.create_scraper(browser='chrome')
+
 # --- FUNKCJE ---
 def get_token():
     url = "https://allegro.pl/auth/oauth/token"
     try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-        }
-        r = requests.post(
+        # Używamy scrapera zamiast zwykłego requests
+        r = scraper.post(
             url, 
             auth=(CLIENT_ID, CLIENT_SECRET), 
-            data={'grant_type': 'client_credentials'},
-            headers=headers
+            data={'grant_type': 'client_credentials'}
         )
         r.raise_for_status()
         return r.json()['access_token']
@@ -37,11 +38,7 @@ def search_allegro(token, phrase):
     
     headers = {
         'Authorization': f'Bearer {token}',
-        'Accept': 'application/vnd.allegro.public.v1+json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept-Language': 'pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7',
-        'Referer': 'https://allegro.pl/',
-        'Origin': 'https://allegro.pl'
+        'Accept': 'application/vnd.allegro.public.v1+json'
     }
     
     params = {
@@ -52,10 +49,11 @@ def search_allegro(token, phrase):
     }
     
     try:
-        r = requests.get(url, headers=headers, params=params)
+        # Tu też scraper
+        r = scraper.get(url, headers=headers, params=params)
         
         if r.status_code == 403:
-            st.error("🔒 Allegro (WAF) zablokowało to zapytanie. Spróbuj za chwilę.")
+            st.error("🔒 Allegro nadal blokuje IP serwera Google. To już kwestia 'banu' na serwerownię.")
             return None
             
         r.raise_for_status()
@@ -75,7 +73,7 @@ if st.button("🔍 Znajdź najtańszą ofertę", type="primary"):
     if not phrase:
         st.warning("Wpisz nazwę!")
     else:
-        with st.spinner('Szukam na Allegro...'):
+        with st.spinner('Szukam na Allegro (Metoda CloudScraper)...'):
             token = get_token()
             if token:
                 offer = search_allegro(token, phrase)
@@ -87,7 +85,6 @@ if st.button("🔍 Znajdź najtańszą ofertę", type="primary"):
                     img = offer['images'][0]['url'] if offer.get('images') else None
                     
                     st.success("Sukces!")
-                    
                     col1, col2 = st.columns([1, 2])
                     with col1:
                         if img: st.image(img)
@@ -96,4 +93,4 @@ if st.button("🔍 Znajdź najtańszą ofertę", type="primary"):
                         st.write(f"**{name}**")
                         st.caption("Oferta 'Kup Teraz'")
                 else:
-                    st.info("Nic nie znaleziono (lub blokada).")
+                    st.info("Nic nie znaleziono.")
